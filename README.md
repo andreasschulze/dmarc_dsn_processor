@@ -32,20 +32,18 @@ status messages. Configure Postfix to deliver these messages with the
 ```
 
 To prevent Postfix from sending multiple recipients per delivery
-request, specify
+request, limit parallel deliveries:
 
 ```txt
 /etc/postfix/main.cf
   dmarc_dsn_processor_destination_recipient_limit = 1
 ```
 
-in the Postfix `main.cf` file.
-
 Now add a transport map entry. You may use the inline map:
 
 ```txt
 /etc/postfix/main.cf
-  transpor_maps = inline:{sender@example=dmarc_dsn_processor}
+  transport_maps = inline:{sender@example=dmarc_dsn_processor}
 ```
 
 Don't forget `postfix reload` and check your logs for warning/errors.
