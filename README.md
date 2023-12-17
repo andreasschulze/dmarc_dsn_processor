@@ -22,7 +22,7 @@ and receive delivery status messages.
 
 Any message **to** the address used as sender is assumed to be a delivery
 status messages. Configure Postfix to deliver these messages with the
-[pipe](http://www.postfix.org/pipe.8.html) delivery agent.
+[pipe](https://www.postfix.org/pipe.8.html) delivery agent.
 
 ```txt
 /etc/postfix/master.cf
