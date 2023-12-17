@@ -6,13 +6,13 @@
 Sending DMARC aggregated reports is a good thing. But if you do so, you will
 note some reports are undeliverable. A simple solution is to simply ignore them.
 But you do not want to deliver messages to addresses known to be undeliverable.
-This may reduce you repotation.
+This may reduce you reputation.
 
 An other option is to not generate reports once a receiver address is known to
 be undeliverable. Mostly this require configuration on the report generator.
 
-This solution follow an other approach: You still generate the reports, but
-discard the messages for some days one a receiver address become knwon to be
+This solution follow an other approach: you still generate the reports, but
+discard the messages for some days once a receiver address become known to be
 undeliverable. After some days you give the receiver a new chance to have it's
 problem solved.
 
@@ -26,7 +26,7 @@ status messages. Configure Postfix to deliver these messages with the
 
 ```txt
 /etc/postfix/master.cf
-  dmarc_dsn_processor unix - n n - 10 pipe
+  dmarc_dsn_processor unix - n n - - pipe
   flags=Rq user=nobody null_sender=
   argv=/path/to/dmarc_dsn_processor.py ${queue_id} /path/to/data_dir
 ```
@@ -47,3 +47,9 @@ Now add a transport map entry. You may use the inline map:
 ```
 
 Don't forget `postfix reload` and check your logs for warning/errors.
+
+Create the working directory:
+
+```sh
+# install -d --owner nobody /path/to/data_dir
+```
