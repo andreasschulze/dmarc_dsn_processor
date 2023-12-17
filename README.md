@@ -17,12 +17,12 @@ undeliverable. After some days you give the receiver a new chance to have it's
 problem solved.
 
 We assume a dedicated sender address for dmarc aggregated reports. We also
-assume you're using the [https://www.postfix.org](Postfix) MTA to send reports
+assume you're using the [Postfix MTA](https://www.postfix.org) to send reports
 and receive delivery status messages.
 
 Any message **to** the address used as sender is assumed to be a delivery
 status messages. Configure Postfix to deliver these messages with the
-[http://www.postfix.org/pipe.8.html](pipe) delivery agent.
+[pipe](http://www.postfix.org/pipe.8.html) delivery agent.
 
 ```txt
 /etc/postfix/master.cf
