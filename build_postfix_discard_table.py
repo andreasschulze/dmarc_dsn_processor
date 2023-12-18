@@ -28,13 +28,12 @@ def handle_dsn(filename: str):
 
         date = dsn_data['date']
         orig_rcpt = dsn_data['orig_rcpt']
-        diag_code = dsn_data['diag_code']
 
         if date is None:
             date = 'unknown'
 
         logging.debug("DEBUG: orig_rcpt=%s, domain=%s, date=%s", orig_rcpt, filename, date)
-        map_line = f"{orig_rcpt} DISCARD: report for {file} bounced {date} last time # {diag_code}"
+        map_line = f"{orig_rcpt} discard:report for {file} bounced {date} last time"
         print(map_line)
 
 # main
@@ -44,11 +43,17 @@ if os.getenv('VERBOSE'):
     LOG_LEVEL = logging.DEBUG
 logging.basicConfig(format='%(message)s', level=LOG_LEVEL)
 
-DATA_DIR = os.getenv('DATA_DIR', './data')
+# same 6 lines of code in dmarc_dsn_processor.py ...
+# pylint: disable=duplicate-code
+DATA_DIR = os.getenv('DATA_DIR', './dmarc_dsn_processor')
 if os.path.isdir(DATA_DIR):
     logging.debug('DEBUG: using %s', DATA_DIR)
 else:
     logging.error('ERROR: %s do not exist or is not a directory', DATA_DIR)
+    sys.exit(1)
+
+if not os.path.exists(DATA_DIR + '/domains/'):
+    logging.error('ERROR: %s/domains do not exist, check DATA_DIR', DATA_DIR)
     sys.exit(1)
 
 MIN_AGE_IS_INT = True
@@ -76,7 +81,7 @@ if MIN_AGE > 90:
 
 TODAY = datetime.datetime.today()
 
-os.chdir(DATA_DIR)
+os.chdir(DATA_DIR + '/domains/')
 for file in os.listdir('.'):
     if os.path.isfile(file):
         file_mod_time = datetime.datetime.fromtimestamp(os.path.getmtime(file))

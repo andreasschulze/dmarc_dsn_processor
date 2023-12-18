@@ -46,10 +46,13 @@ Now add a transport map entry. You may use the inline map:
   transport_maps = inline:{sender@example=dmarc_dsn_processor}
 ```
 
-Don't forget `postfix reload` and check your logs for warning/errors.
-
 Create the working directory:
 
 ```sh
 # install -d --owner nobody /path/to/data_dir
 ```
+
+Finally, don't forget `postfix reload` and check your logs for warning/errors.
+
+Now, wait until reports are sent (and get some dsn messages)
+
