@@ -27,7 +27,8 @@ status messages. Configure Postfix to deliver these messages with the
 ```txt
 /etc/postfix/master.cf
   dmarc_dsn_processor unix - n n - - pipe
-  flags=Rq user=nobody null_sender=
+  flags=Rq
+  user=nobody
   argv=/path/to/dmarc_dsn_processor.py ${queue_id} /path/to/data_dir
 ```
 
@@ -54,4 +55,23 @@ Create the working directory:
 
 Finally, don't forget `postfix reload` and check your logs for warning/errors.
 
-Now, wait until reports are sent (and get some dsn messages)
+Now, wait until reports are sent (and get some dsn messages). By time, you'll
+see `/path/to/data_dir/domains/` get populated.
+
+Now use `build_postfix_discard_table.py` create a postfix map that discard
+future messages to the addresses known to be undeliverable.
+
+```sh
+# /path/to/build_postfix_discard_table.py /path/to/data_dir > /etc/postfix/dmarc_discard
+# postmap /etc/postfix/dmarc_discard
+```
+
+These map is used as [transport_map](https://www.postfix.org/postconf.5.html#transport_maps)
+.
+
+```txt
+/etc/postfix/main.cf
+  transport_maps =
+    inline:{sender@example=dmarc_dsn_processor}
+    ${default_database_type}:${config_directory}/dmarc_discard
+```
