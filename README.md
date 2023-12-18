@@ -55,4 +55,3 @@ Create the working directory:
 Finally, don't forget `postfix reload` and check your logs for warning/errors.
 
 Now, wait until reports are sent (and get some dsn messages)
-
