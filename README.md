@@ -75,3 +75,11 @@ These map is used as [transport_map](https://www.postfix.org/postconf.5.html#tra
     inline:{sender@example=dmarc_dsn_processor}
     ${default_database_type}:${config_directory}/dmarc_discard
 ```
+
+Monitor you log and confirm messages are discarded. Setup a cron job to call
+`build_postfix_discard_table.py` and `postmap` daily. You do not need
+`postfix reload`. Postfix will notice the changed transport_map.
+
+Now, you receive no dsn for, say `example.org` and the file `/path/to/data_dir/domains/example.org`
+get older. If it's older then 30 days, `build_postfix_discard_table.py` no longer
+create an entry to discard messages to that specific domain's DMARC report receiver.
