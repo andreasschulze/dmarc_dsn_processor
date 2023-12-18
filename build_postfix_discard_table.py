@@ -87,7 +87,7 @@ for file in os.listdir('.'):
         file_mod_time = datetime.datetime.fromtimestamp(os.path.getmtime(file))
         age = TODAY - file_mod_time
 
-        if age.days >= MIN_AGE:
+        if age.days < MIN_AGE:
             handle_dsn(file)
         else:
-            logging.debug("DEBUG: file %s is not older then %s day(s)", file, MIN_AGE)
+            logging.debug("DEBUG: file %s is older then %s day(s)", file, MIN_AGE)
