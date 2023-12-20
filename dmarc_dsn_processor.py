@@ -20,7 +20,7 @@ the following envoronment variables are used:
 
 
 Requirements on Debian:
-apt-get install python3-minimal python3-json5
+apt-get install python3-minimal python3-json5 python3-validators
 
 """
 
@@ -31,7 +31,9 @@ import logging
 import os
 import re
 import sys
+import validators
 
+# pylint: disable=too-many-branches
 def process_dsn(mail_data: str):
 
     """
@@ -41,6 +43,7 @@ def process_dsn(mail_data: str):
     msg = email.message_from_string(mail_data)
     recipients = []
     orig_subject = None
+    report_domain = None
     re_multiline = re.compile("\n\\s+")
     re_report_domain = re.compile("^Report Domain:\\s")
     re_submitter = re.compile("\\sSubmitter:\\s.*$")
@@ -75,7 +78,13 @@ def process_dsn(mail_data: str):
         if orig_subject == report_domain:
             # the re above didn't catch/match
             logging.error("ERROR: unexpected subject, probably not a dsn for a dmarc report")
-            save_message()
+            save_message('no_subject_re_match')
+            sys.exit(0)
+
+        if not validators.domain(report_domain):
+            # the re above did not produce a raw domainname
+            logging.error("ERROR: unexpected subject, probably not a dsn for a dmarc report")
+            save_message('no_subject_domainname')
             sys.exit(0)
 
     for rcpt in recipients:
@@ -101,15 +110,15 @@ def dsn_detail_to_data_dir(dsn_detail: dict, data_dir: str):
                 file.write(json.dumps(dsn) + "\n")
         else:
             logging.error("ERROR: no report_domain in '%s'", dsn)
-            save_message()
+            save_message('no_report_domain')
 
-def save_message():
+def save_message(reason: str):
 
     """
     save MAIL_DATA for debugging purposes
     """
 
-    pathname = DATA_DIR + '/saved/' + QUEUE_ID
+    pathname = DATA_DIR + '/saved/' + QUEUE_ID + '.' + reason
     with open(pathname, 'a', encoding='utf-8') as file:
         file.write(MAIL_DATA)
         file.close()
@@ -171,7 +180,7 @@ dsn_details = process_dsn(MAIL_DATA)
 logging.debug("DEBUG: dsn_details='%s'", dsn_details)
 if not dsn_details:
     logging.debug("DEBUG: dsn_details is empty")
-    save_message()
+    save_message('no_dsn_details')
     sys.exit(0)
 
 logging.debug("DEBUG: dsn_details is not empty")
