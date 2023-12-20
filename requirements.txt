@@ -1,2 +1,2 @@
 json
-validator
+validators
