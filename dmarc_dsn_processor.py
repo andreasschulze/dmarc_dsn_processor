@@ -51,9 +51,14 @@ def process_dsn(mail_data: str):
         if part.get_content_type() == "message/delivery-status":
             for subpart in part.walk():
                 rcpt = {}
-                if 'Action' in subpart and 'Original-Recipient' in subpart:
+                # https://datatracker.ietf.org/doc/html/rfc3461#section-6.3
+                if 'Action' in subpart and 'Final-Recipient' in subpart:
                     rcpt["action"] = subpart['Action']
-                    rcpt["orig_rcpt"] = subpart['Original-Recipient'].replace('rfc822;', '')
+                    rcpt["final_rcpt"] = subpart['Final-Recipient'].replace('rfc822;', '')
+                    if 'Original-Recipient' in subpart:
+                        rcpt["orig_rcpt"] = subpart['Original-Recipient'].replace('rfc822;', '')
+                    else:
+                        rcpt["orig_rcpt"] = rcpt["final_rcpt"]
                     rcpt["diag_code"] = None
                     if 'Diagnostic-Code' in subpart:
                         # kann aus mehreren Zeilen bestehen
@@ -62,7 +67,8 @@ def process_dsn(mail_data: str):
                     rcpt["status"] = None
                     if 'Status' in subpart:
                         rcpt["status"] = subpart['Status']
-                    logging.debug("DEBUG: adding rpct=%s", rcpt["orig_rcpt"])
+                    logging.debug("DEBUG: adding final_rpct=%s, orig_rcpt=%s",
+                                  rcpt["final_rcpt"], rcpt["orig_rcpt"])
                     recipients.append(rcpt)
 
         if part.get_content_type() == "message/rfc822":
