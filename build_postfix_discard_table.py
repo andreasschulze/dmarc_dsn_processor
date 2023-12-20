@@ -43,9 +43,13 @@ if os.getenv('VERBOSE'):
     LOG_LEVEL = logging.DEBUG
 logging.basicConfig(format='%(message)s', level=LOG_LEVEL)
 
-# same 6 lines of code in dmarc_dsn_processor.py ...
+# same lines of code in dmarc_dsn_processor.py ...
 # pylint: disable=duplicate-code
-DATA_DIR = os.getenv('DATA_DIR', './dmarc_dsn_processor')
+if len(sys.argv) > 1:
+    DATA_DIR = sys.argv[1]
+else:
+    DATA_DIR = os.getenv('DATA_DIR', './dmarc_dsn_processor')
+
 if os.path.isdir(DATA_DIR):
     logging.debug('DEBUG: using %s', DATA_DIR)
 else:
@@ -69,7 +73,7 @@ else:
     logging.error("ERROR: ENV[MIN_AGE] = '%s', but must be an integer", MIN_AGE)
     sys.exit(1)
 
-# don't accept nagative ages
+# don't accept negative ages
 if MIN_AGE < 0:
     logging.error("ERROR: ENV[MIN_AGE] must be a positive integer")
     sys.exit(1)
