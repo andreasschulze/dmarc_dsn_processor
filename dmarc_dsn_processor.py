@@ -44,6 +44,12 @@ def process_dsn(mail_data: str):
     recipients = []
     orig_subject = None
     report_domain = None
+
+    # [Final|Orginal]-Recipient may have a space or even not:
+    # Final-Resipient: rfc822; with_space@example.org
+    # Original-Recipient: rfc822;without_space@example.org
+    re_822_prefix = re.compile("rfc822;\\s?")
+
     re_multiline = re.compile("\n\\s+")
     re_report_domain = re.compile("^Report Domain:\\s")
     re_submitter = re.compile("\\sSubmitter:\\s.*$")
@@ -54,9 +60,9 @@ def process_dsn(mail_data: str):
                 # https://datatracker.ietf.org/doc/html/rfc3461#section-6.3
                 if 'Action' in subpart and 'Final-Recipient' in subpart:
                     rcpt["action"] = subpart['Action']
-                    rcpt["final_rcpt"] = subpart['Final-Recipient'].replace('rfc822;', '')
+                    rcpt["final_rcpt"] = re.sub(re_822_prefix, '', subpart['Final-Recipient'])
                     if 'Original-Recipient' in subpart:
-                        rcpt["orig_rcpt"] = subpart['Original-Recipient'].replace('rfc822;', '')
+                        rcpt["orig_rcpt"] = re.sub(re_822_prefix, '', subpart['Original-Recipient'])
                     else:
                         rcpt["orig_rcpt"] = rcpt["final_rcpt"]
                     rcpt["diag_code"] = None
