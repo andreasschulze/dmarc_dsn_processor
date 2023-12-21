@@ -62,7 +62,8 @@ def process_dsn(mail_data: str):
                     rcpt["diag_code"] = None
                     if 'Diagnostic-Code' in subpart:
                         # may be multiline
-                        # continuation lines (intended with SPACES) are replaced by exactly one SPACE
+                        # continuation lines (intended with SPACES) are replaced
+                        # by exactly one SPACE
                         rcpt["diag_code"] = re.sub(re_multiline, ' ', subpart['Diagnostic-Code'])
                     rcpt["status"] = None
                     if 'Status' in subpart:
