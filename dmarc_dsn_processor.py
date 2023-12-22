@@ -51,7 +51,7 @@ def process_dsn(mail_data: str):
     re_822_prefix = re.compile("rfc822;\\s?")
 
     re_multiline = re.compile("\n\\s+")
-    re_report_domain = re.compile("^Report Domain:\\s")
+    re_report_domain = re.compile("^.*Report Domain:\\s")
     re_submitter = re.compile("\\sSubmitter:\\s.*$")
     for part in msg.walk():
         if part.get_content_type() == "message/delivery-status":
