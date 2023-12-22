@@ -60,6 +60,10 @@ def process_dsn(mail_data: str):
                 # https://datatracker.ietf.org/doc/html/rfc3461#section-6.3
                 if 'Action' in subpart and 'Final-Recipient' in subpart:
                     rcpt["action"] = subpart['Action']
+                    if rcpt["action"] == 'delayed':
+                        logging.info('INFO: this is only about a delayed delivery')
+                        sys.exit(0)
+
                     rcpt["final_rcpt"] = re.sub(re_822_prefix, '', subpart['Final-Recipient'])
                     if 'Original-Recipient' in subpart:
                         rcpt["orig_rcpt"] = re.sub(re_822_prefix, '', subpart['Original-Recipient'])
