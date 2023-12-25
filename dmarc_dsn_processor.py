@@ -85,7 +85,7 @@ def process_dsn(mail_data: str):
         if part.get_content_type() == "message/rfc822":
             for subpart in part.walk():
                 if orig_subject is None and subpart["Subject"] is not None:
-                    orig_subject = re.sub(re_multiline, '', subpart["Subject"])
+                    orig_subject = re.sub(re_multiline, ' ', subpart["Subject"])
                     logging.debug("DEBUG: orig_subject=%s", orig_subject)
 
     if orig_subject is not None:
