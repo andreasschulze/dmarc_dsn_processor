@@ -33,7 +33,7 @@ import re
 import sys
 import validators
 
-# pylint: disable=too-many-branches
+# pylint: disable=too-many-branches,too-many-statements
 def process_dsn(mail_data: str):
 
     """
@@ -87,6 +87,12 @@ def process_dsn(mail_data: str):
                 if orig_subject is None and subpart["Subject"] is not None:
                     orig_subject = re.sub(re_multiline, ' ', subpart["Subject"])
                     logging.debug("DEBUG: orig_subject=%s", orig_subject)
+
+        if part.get_content_type() == "text/rfc822-headers":
+            payload = email.message_from_string(part.get_payload())
+            if orig_subject is None and payload["Subject"] is not None:
+                orig_subject = re.sub(re_multiline, ' ', payload["Subject"])
+                logging.debug("DEBUG: orig_subject=%s", orig_subject)
 
     if orig_subject is not None:
         report_domain = re.sub(re_submitter, '',
