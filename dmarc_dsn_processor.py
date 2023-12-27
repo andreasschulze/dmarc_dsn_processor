@@ -33,7 +33,94 @@ import re
 import sys
 import validators
 
-# pylint: disable=too-many-branches,too-many-statements
+RE_MULTILINE     = re.compile("\n\\s+")
+RE_REPORT_DOMAIN = re.compile("^.*Report Domain:\\s")
+RE_SUBMITTER     = re.compile("\\sSubmitter:\\s.*$")
+
+# [Final|Orginal]-Recipient may have a space or even not:
+# Final-Resipient: rfc822; with_space@example.org
+# Original-Recipient: rfc822;without_space@example.org
+RE_822_PREFIX    = re.compile("rfc822;\\s?")
+
+# reportdomain in Google Groups DSN, References Header
+RE_REFERENCES_REPORT_DOMAIN = re.compile("^<(.*)-\\d+@.*$")
+
+def unfold(header_value: str):
+
+    """
+    return the header value without linebreaks
+    """
+
+    # continuation lines (intended with SPACES) are replaced
+    # by exactly one SPACE
+    return re.sub(RE_MULTILINE, ' ', header_value)
+
+def get_report_domain_from_subject(subject: str):
+
+    """
+    try to extract a report domain from a Subject: header
+    """
+
+    if subject is None:
+        return None
+
+    report_domain = re.sub(RE_SUBMITTER, '',
+        re.sub(RE_REPORT_DOMAIN, '', subject))
+
+    if subject == report_domain:
+        # the re above didn't catch/match
+        logging.error("ERROR: unexpected subject,"
+            "probably not a dsn for a dmarc report")
+        save_message('no_subject_re_match')
+        sys.exit(0)
+
+    if not validators.domain(report_domain):
+        # the re above did not produce a raw domainname
+        logging.error("ERROR: no valid report_domain in subject, \
+            probably not a dsn for a dmarc report")
+        save_message('no_subject_domainname')
+        sys.exit(0)
+
+    return report_domain
+
+def process_googlegroups_dsn(msg):
+
+    """
+    process a DSN message as seen from Google Groups
+    """
+
+    logging.debug("DEBUG: process_googlegroups_dsn")
+    recipients = []
+
+    if msg['from'] != "Mail Delivery Subsystem <mailer-daemon@googlemail.com>":
+        logging.debug("process_googlegroups_dsn: not from googlemail.com")
+        return recipients
+
+    for header_name in 'x-failed-recipients', 'references', 'in-reply-to':
+        if msg[header_name] is None:
+            logging.debug("process_googlegroups_dsn: missing %s header", header_name)
+            return recipients
+
+    if msg['references'] != msg['in-reply-to']:
+        logging.debug("process_googlegroups_dsn: references header != in-reply-to header")
+        return recipients
+
+    rcpt = {}
+    match = re.search(RE_REFERENCES_REPORT_DOMAIN, msg['references'])
+    if not match:
+        logging.error("ERROR: no report_domain in google groups dsn references header")
+        save_message('')
+        sys.exit(1)
+
+    rcpt['report_domain'] = match.group(1)
+    rcpt['action'] = 'failed'
+    rcpt['status'] = '5.1.1' # https://datatracker.ietf.org/doc/html/rfc3463#section-3.2
+    rcpt['final_rcpt'] = msg['x-failed-recipients']
+    rcpt["orig_rcpt"] = rcpt["final_rcpt"]
+    recipients.append(rcpt)
+    return recipients
+
+# pylint: disable=too-many-branches
 def process_dsn(mail_data: str):
 
     """
@@ -45,14 +132,6 @@ def process_dsn(mail_data: str):
     orig_subject = None
     report_domain = None
 
-    # [Final|Orginal]-Recipient may have a space or even not:
-    # Final-Resipient: rfc822; with_space@example.org
-    # Original-Recipient: rfc822;without_space@example.org
-    re_822_prefix = re.compile("rfc822;\\s?")
-
-    re_multiline = re.compile("\n\\s+")
-    re_report_domain = re.compile("^.*Report Domain:\\s")
-    re_submitter = re.compile("\\sSubmitter:\\s.*$")
     for part in msg.walk():
         if part.get_content_type() == "message/delivery-status":
             for subpart in part.walk():
@@ -64,20 +143,21 @@ def process_dsn(mail_data: str):
                         logging.info('INFO: this is only about a delayed delivery')
                         sys.exit(0)
 
-                    rcpt["final_rcpt"] = re.sub(re_822_prefix, '', subpart['Final-Recipient'])
+                    rcpt["final_rcpt"] = re.sub(RE_822_PREFIX, '', subpart['Final-Recipient'])
                     if 'Original-Recipient' in subpart:
-                        rcpt["orig_rcpt"] = re.sub(re_822_prefix, '', subpart['Original-Recipient'])
+                        rcpt["orig_rcpt"] = re.sub(RE_822_PREFIX, '', subpart['Original-Recipient'])
                     else:
                         rcpt["orig_rcpt"] = rcpt["final_rcpt"]
+
                     rcpt["diag_code"] = None
                     if 'Diagnostic-Code' in subpart:
                         # may be multiline
-                        # continuation lines (intended with SPACES) are replaced
-                        # by exactly one SPACE
-                        rcpt["diag_code"] = re.sub(re_multiline, ' ', subpart['Diagnostic-Code'])
+                        rcpt["diag_code"] = unfold(subpart['Diagnostic-Code'])
+
                     rcpt["status"] = None
                     if 'Status' in subpart:
                         rcpt["status"] = subpart['Status']
+
                     logging.debug("DEBUG: adding final_rpct=%s, orig_rcpt=%s",
                                   rcpt["final_rcpt"], rcpt["orig_rcpt"])
                     recipients.append(rcpt)
@@ -85,35 +165,26 @@ def process_dsn(mail_data: str):
         if part.get_content_type() == "message/rfc822":
             for subpart in part.walk():
                 if orig_subject is None and subpart["Subject"] is not None:
-                    orig_subject = re.sub(re_multiline, ' ', subpart["Subject"])
+                    orig_subject = unfold(subpart["Subject"])
                     logging.debug("DEBUG: orig_subject=%s", orig_subject)
 
         if part.get_content_type() == "text/rfc822-headers":
             payload = email.message_from_string(part.get_payload())
             if orig_subject is None and payload["Subject"] is not None:
-                orig_subject = re.sub(re_multiline, ' ', payload["Subject"])
+                orig_subject = unfold(payload["Subject"])
                 logging.debug("DEBUG: orig_subject=%s", orig_subject)
 
-    if orig_subject is not None:
-        report_domain = re.sub(re_submitter, '',
-          re.sub(re_report_domain, '', orig_subject))
+    report_domain = get_report_domain_from_subject(orig_subject)
 
-        if orig_subject == report_domain:
-            # the re above didn't catch/match
-            logging.error("ERROR: unexpected subject, probably not a dsn for a dmarc report")
-            save_message('no_subject_re_match')
-            sys.exit(0)
-
-        if not validators.domain(report_domain):
-            # the re above did not produce a raw domainname
-            logging.error("ERROR: unexpected subject, probably not a dsn for a dmarc report")
-            save_message('no_subject_domainname')
-            sys.exit(0)
+    # so far no results?
+    if not recipients:
+        recipients = process_googlegroups_dsn(msg)
 
     for rcpt in recipients:
-        logging.debug("DEBUG: rcpt=%s, adding report_domain='%s'",
-                      rcpt['orig_rcpt'], report_domain)
-        rcpt["report_domain"] = report_domain
+        if rcpt["report_domain"] is None:
+            logging.debug("DEBUG: rcpt=%s, adding report_domain='%s'",
+                rcpt['orig_rcpt'], report_domain)
+            rcpt["report_domain"] = report_domain
         rcpt["date"] = DATE
 
     return recipients
@@ -191,7 +262,7 @@ for subdir in [ 'domains', 'saved']:
     try:
         os.mkdir(DATA_DIR + '/' + subdir + '/')
     except FileExistsError:
-        # ignore if it already exist
+        # ignore if subdir already exist
         pass
 
 # now we could call 'save_message' ...

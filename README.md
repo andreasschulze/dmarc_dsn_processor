@@ -62,8 +62,9 @@ Now use `build_postfix_discard_table.py` create a postfix map that discard
 future messages to the addresses known to be undeliverable.
 
 ```sh
-# /path/to/build_postfix_discard_table.py /path/to/data_dir > /etc/postfix/dmarc_discard
-# postmap /etc/postfix/dmarc_discard
+# /path/to/build_postfix_discard_table.py /path/to/data_dir \
+    > /etc/postfix/dmarc_dsn_processor_discards
+# postmap /etc/postfix/dmarc_dsn_processor_discards
 ```
 
 These map is used as [transport_map](https://www.postfix.org/postconf.5.html#transport_maps)
@@ -73,13 +74,14 @@ These map is used as [transport_map](https://www.postfix.org/postconf.5.html#tra
 /etc/postfix/main.cf
   transport_maps =
     inline:{sender@example=dmarc_dsn_processor}
-    ${default_database_type}:${config_directory}/dmarc_discard
+    ${default_database_type}:${config_directory}/dmarc_dsn_processor_discards
 ```
 
 Monitor you log and confirm messages are discarded. Setup a cron job to call
-`build_postfix_discard_table.py` and `postmap` daily. You do not need
+`build_postfix_discard_table.py` and `postmap` daily or hourly. You do not need
 `postfix reload`. Postfix will notice the changed transport_map.
 
 Now, you receive no dsn for, say `example.org` and the file `/path/to/data_dir/domains/example.org`
 get older. If it's older then 30 days, `build_postfix_discard_table.py` no longer
 create an entry to discard messages to that specific domain's DMARC report receiver.
+This gives the domain owner a next chance.
