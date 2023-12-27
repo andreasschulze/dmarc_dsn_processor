@@ -181,7 +181,7 @@ def process_dsn(mail_data: str):
         recipients = process_googlegroups_dsn(msg)
 
     for rcpt in recipients:
-        if rcpt["report_domain"] is None:
+        if "report_domain" not in rcpt:
             logging.debug("DEBUG: rcpt=%s, adding report_domain='%s'",
                 rcpt['orig_rcpt'], report_domain)
             rcpt["report_domain"] = report_domain
