@@ -5,8 +5,9 @@ Andreas Schulze, 2023, https://github.com/andreasschulze
 
 This program process dsn messages received for DMARC aggregate reports.
 
-Usage: cat dns_message | $0 queue_id [data_dir]
+Usage: cat dns_message | $0 queue_id extention [data_dir]
 
+  - extention must be present, may be empty
   - data_dir if missing, ENV[DATA_DIR] is used
   - data_dir must exist and be writeable for the current uid
 
@@ -42,8 +43,11 @@ RE_SUBMITTER     = re.compile("\\sSubmitter:\\s.*$")
 # Original-Recipient: rfc822;without_space@example.org
 RE_822_PREFIX    = re.compile("rfc822;\\s?")
 
-# reportdomain in Google Groups DSN, References Header
+# report_domain in Google Groups DSN, References Header
 RE_REFERENCES_REPORT_DOMAIN = re.compile("^<(.*)-\\d+@.*$")
+
+# report_domain somewhere in the whole message
+RE_BODY_REPORT_DOMAIN = re.compile("^.*Report Domain:\\s(.*)\\sSubmitter.*$", flags=re.MULTILINE)
 
 def unfold(header_value: str):
 
@@ -69,16 +73,16 @@ def get_report_domain_from_subject(subject: str):
 
     if subject == report_domain:
         # the re above didn't catch/match
-        logging.error("ERROR: unexpected subject,"
+        logging.error("ERROR: unexpected subject, "
             "probably not a dsn for a dmarc report")
         save_message('no_subject_re_match')
         sys.exit(0)
 
     if not validators.domain(report_domain):
         # the re above did not produce a raw domainname
-        logging.error("ERROR: no valid report_domain in subject, \
-            probably not a dsn for a dmarc report")
-        save_message('no_subject_domainname')
+        logging.error("ERROR: '%s' is no valid report_domain in string, "
+            "probably not a dsn for a dmarc report", report_domain)
+        save_message('no_report_domain')
         sys.exit(0)
 
     return report_domain
@@ -93,7 +97,7 @@ def process_googlegroups_dsn(msg):
     recipients = []
 
     if msg['from'] != "Mail Delivery Subsystem <mailer-daemon@googlemail.com>":
-        logging.debug("process_googlegroups_dsn: not from googlemail.com")
+        logging.debug("DEBUG: process_googlegroups_dsn: not from googlemail.com")
         return recipients
 
     for header_name in 'x-failed-recipients', 'references', 'in-reply-to':
@@ -105,18 +109,66 @@ def process_googlegroups_dsn(msg):
         logging.debug("process_googlegroups_dsn: references header != in-reply-to header")
         return recipients
 
-    rcpt = {}
     match = re.search(RE_REFERENCES_REPORT_DOMAIN, msg['references'])
     if not match:
         logging.error("ERROR: no report_domain in google groups dsn references header")
-        save_message('')
-        sys.exit(1)
+        save_message('no_report_domain_in_references_header')
+        sys.exit(0)
 
-    rcpt['report_domain'] = match.group(1)
+    report_domain = match.group(1)
+    if not validators.domain(report_domain):
+        # the re above did not produce a raw domainname
+        logging.error("ERROR: '%s' is no valid report_domain in string, "
+            "probably not a dsn for a dmarc report", report_domain)
+        save_message('no_report_domain')
+        sys.exit(0)
+
+    rcpt = {}
+    rcpt['report_domain'] = report_domain
     rcpt['action'] = 'failed'
     rcpt['status'] = '5.1.1' # https://datatracker.ietf.org/doc/html/rfc3463#section-3.2
     rcpt['final_rcpt'] = msg['x-failed-recipients']
     rcpt["orig_rcpt"] = rcpt["final_rcpt"]
+
+    recipients.append(rcpt)
+    return recipients
+
+def process_with_extention(extention: str, mail_data: str):
+
+    """
+    process the email, for a known extention
+    in this case, only the report domain must be searched
+    """
+
+    logging.debug("DEBUG: process_with_extention")
+
+    report_rcpt = extention.replace("=", "@")
+    if not validators.email(report_rcpt):
+        logging.error("ERROR: '%s' is not a valid report_rcpt", report_rcpt)
+        save_message('no_report_rcpt_in_extention')
+        sys.exit(0)
+
+    match = re.search(RE_BODY_REPORT_DOMAIN, mail_data)
+    if not match:
+        logging.error("ERROR: no report_domain in message")
+        save_message('no_report_domain_in_message')
+        sys.exit(0)
+
+    report_domain = match.group(1)
+    if not validators.domain(report_domain):
+        # the re above did not produce a raw domainname
+        logging.error("ERROR: '%s' is no valid report_domain in string,"
+            "probably not a dsn for a dmarc report", report_domain)
+        save_message('no_report_domain')
+        sys.exit(0)
+
+    rcpt = {}
+    rcpt['report_domain'] = report_domain
+    rcpt["action"] = "any_reason"
+    rcpt["orig_rcpt"] = extention.replace("=", "@")
+    rcpt["date"] = DATE
+
+    recipients = []
     recipients.append(rcpt)
     return recipients
 
@@ -233,17 +285,19 @@ logging.basicConfig(format='%(message)s', level=LOG_LEVEL)
 
 # argv[0] = program name
 # argv[1] = queue_id
-# argv[2] = first parameter (data_dir), optional, default './dmarc_dsn_processor
-# len(argv) == 3
+# argv[2] = extention
+# argv[3] = data_dir, optional, default to $DATA_DIR, default to ./dmarc_dsn_processor
+# len(argv) == 4
 
-if len(sys.argv) < 2:
-    logging.error("ERROR: usage: $0 queue_id [work_dir]")
+if len(sys.argv) < 3:
+    logging.error("ERROR: usage: $0 queue_id extention [work_dir]")
     sys.exit(1)
 
-QUEUE_ID = sys.argv[1]
+QUEUE_ID  = sys.argv[1]
+EXTENTION = sys.argv[2]
 
-if len(sys.argv) > 2 and sys.argv[2] is not None:
-    DATA_DIR = sys.argv[2]
+if len(sys.argv) > 2 and sys.argv[3] is not None:
+    DATA_DIR = sys.argv[3]
 else:
     DATA_DIR = os.getenv('DATA_DIR', './dmarc_dsn_processor')
 
@@ -265,18 +319,23 @@ for subdir in [ 'domains', 'saved']:
         # ignore if subdir already exist
         pass
 
-# now we could call 'save_message' ...
+# now we may call 'save_message' ...
 
 today = datetime.date.today()
 DATE = today.strftime("%Y%m%d")
 
-dsn_details = process_dsn(MAIL_DATA)
+if EXTENTION != "":
+    logging.debug("DEBUG: extention='%s'", EXTENTION)
+    dsn_details = process_with_extention(EXTENTION, MAIL_DATA)
+else:
+    dsn_details = process_dsn(MAIL_DATA)
+
 logging.debug("DEBUG: dsn_details='%s'", dsn_details)
 if not dsn_details:
     logging.debug("DEBUG: dsn_details is empty")
     save_message('no_dsn_details')
     sys.exit(0)
 
-logging.debug("DEBUG: dsn_details is not empty")
+logging.debug("DEBUG: dsn_details found")
 dsn_detail_to_data_dir(dsn_details, DATA_DIR)
 sys.exit(0)

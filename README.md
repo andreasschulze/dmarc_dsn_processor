@@ -29,15 +29,17 @@ status messages. Configure Postfix to deliver these messages with the
   dmarc_dsn_processor unix - n n - - pipe
   flags=Rq
   user=nobody
-  argv=/path/to/dmarc_dsn_processor.py ${queue_id} /path/to/data_dir
+  argv=/path/to/dmarc_dsn_processor.py ${queue_id} ${extention} /path/to/data_dir
 ```
 
+Enable address extentions that may contain VERP information.
 To prevent Postfix from sending multiple recipients per delivery
 request, limit parallel deliveries:
 
 ```txt
 /etc/postfix/main.cf
   dmarc_dsn_processor_destination_recipient_limit = 1
+  recipient_delimiter = +
 ```
 
 Now add a transport map entry. You may use the inline map:
