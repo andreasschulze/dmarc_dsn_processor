@@ -29,7 +29,7 @@ status messages. Configure Postfix to deliver these messages with the
   dmarc_dsn_processor unix - n n - - pipe
   flags=Rq
   user=nobody
-  argv=/path/to/dmarc_dsn_processor.py ${queue_id} ${extention} /path/to/data_dir
+  argv=/path/to/dmarc_dsn_processor.py ${queue_id} ${extension} /path/to/data_dir
 ```
 
 Enable address extentions that may contain VERP information.
