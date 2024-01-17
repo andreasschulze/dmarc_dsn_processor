@@ -294,7 +294,7 @@ if len(sys.argv) < 3:
     sys.exit(1)
 
 QUEUE_ID  = sys.argv[1]
-EXTENTION = sys.argv[2]
+EXTENSION = sys.argv[2]
 
 if len(sys.argv) > 2 and sys.argv[3] is not None:
     DATA_DIR = sys.argv[3]
@@ -324,9 +324,9 @@ for subdir in [ 'domains', 'saved']:
 today = datetime.date.today()
 DATE = today.strftime("%Y%m%d")
 
-if EXTENTION != "":
-    logging.debug("DEBUG: extension='%s'", EXTENTION)
-    dsn_details = process_with_extension(EXTENTION, MAIL_DATA)
+if EXTENSION != "":
+    logging.debug("DEBUG: extension='%s'", EXTENSION)
+    dsn_details = process_with_extension(EXTENSION, MAIL_DATA)
 else:
     dsn_details = process_dsn(MAIL_DATA)
 
