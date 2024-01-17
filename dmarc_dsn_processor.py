@@ -318,6 +318,7 @@ for subdir in [ 'domains', 'saved']:
     except FileExistsError:
         # ignore if subdir already exist
         pass
+# TODO: catch more errors
 
 # now we may call 'save_message' ...
 
