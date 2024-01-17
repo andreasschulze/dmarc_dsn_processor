@@ -32,7 +32,7 @@ status messages. Configure Postfix to deliver these messages with the
   argv=/path/to/dmarc_dsn_processor.py ${queue_id} ${extension} /path/to/data_dir
 ```
 
-Enable address extentions that may contain VERP information.
+Enable address extensions that may contain VERP information.
 To prevent Postfix from sending multiple recipients per delivery
 request, limit parallel deliveries:
 

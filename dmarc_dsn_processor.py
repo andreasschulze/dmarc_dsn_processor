@@ -5,9 +5,9 @@ Andreas Schulze, 2023, https://github.com/andreasschulze
 
 This program process dsn messages received for DMARC aggregate reports.
 
-Usage: cat dns_message | $0 queue_id extention [data_dir]
+Usage: cat dns_message | $0 queue_id extension [data_dir]
 
-  - extention must be present, may be empty
+  - extension must be present, may be empty
   - data_dir if missing, ENV[DATA_DIR] is used
   - data_dir must exist and be writeable for the current uid
 
@@ -133,19 +133,19 @@ def process_googlegroups_dsn(msg):
     recipients.append(rcpt)
     return recipients
 
-def process_with_extention(extention: str, mail_data: str):
+def process_with_extension(extension: str, mail_data: str):
 
     """
-    process the email, for a known extention
+    process the email, for a known extension
     in this case, only the report domain must be searched
     """
 
-    logging.debug("DEBUG: process_with_extention")
+    logging.debug("DEBUG: process_with_extension")
 
-    report_rcpt = extention.replace("=", "@")
+    report_rcpt = extension.replace("=", "@")
     if not validators.email(report_rcpt):
         logging.error("ERROR: '%s' is not a valid report_rcpt", report_rcpt)
-        save_message('no_report_rcpt_in_extention')
+        save_message('no_report_rcpt_in_extension')
         sys.exit(0)
 
     match = re.search(RE_BODY_REPORT_DOMAIN, mail_data)
@@ -165,7 +165,7 @@ def process_with_extention(extention: str, mail_data: str):
     rcpt = {}
     rcpt['report_domain'] = report_domain
     rcpt["action"] = "any_reason"
-    rcpt["orig_rcpt"] = extention.replace("=", "@")
+    rcpt["orig_rcpt"] = extension.replace("=", "@")
     rcpt["date"] = DATE
 
     recipients = []
@@ -285,12 +285,12 @@ logging.basicConfig(format='%(message)s', level=LOG_LEVEL)
 
 # argv[0] = program name
 # argv[1] = queue_id
-# argv[2] = extention
+# argv[2] = extension
 # argv[3] = data_dir, optional, default to $DATA_DIR, default to ./dmarc_dsn_processor
 # len(argv) == 4
 
 if len(sys.argv) < 3:
-    logging.error("ERROR: usage: $0 queue_id extention [work_dir]")
+    logging.error("ERROR: usage: $0 queue_id extension [work_dir]")
     sys.exit(1)
 
 QUEUE_ID  = sys.argv[1]
@@ -325,8 +325,8 @@ today = datetime.date.today()
 DATE = today.strftime("%Y%m%d")
 
 if EXTENTION != "":
-    logging.debug("DEBUG: extention='%s'", EXTENTION)
-    dsn_details = process_with_extention(EXTENTION, MAIL_DATA)
+    logging.debug("DEBUG: extension='%s'", EXTENTION)
+    dsn_details = process_with_extension(EXTENTION, MAIL_DATA)
 else:
     dsn_details = process_dsn(MAIL_DATA)
 
